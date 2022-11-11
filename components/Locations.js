@@ -8,6 +8,7 @@ export const getLocationsQuery = gql`
       year
       country
       total_population
+      area
     }
   }
 `;

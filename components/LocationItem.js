@@ -17,8 +17,26 @@ const DELETE_LOCATION_MUTATION = gql`
   }
 `;
 
+const UPDATE_LOCATION_MUTATION = gql`
+  mutation ($idOfLocation: ID!, $locationUpdateData: updateLocationInput!) {
+    updateLocation(idOfLocation: $idOfLocation, data: $locationUpdateData) {
+      id
+      year
+      country
+      total_population
+      area
+    }
+  }
+`;
+
 const LocationItem = ({ location }) => {
   const alert = useAlert();
+  const [createLocationDetails, setCreateLocationDetails] = useState({
+    country: "",
+    year: "",
+    area: "",
+    total_population: "",
+  });
   const [deleteLocationConfirmation, setDeleteLocationConfirmation] =
     useState(false);
 
@@ -64,14 +82,77 @@ const LocationItem = ({ location }) => {
     },
   });
 
+  const [updateLocation, { loading: updateLoading }] = useMutation(
+    UPDATE_LOCATION_MUTATION,
+    {
+      variables: {
+        idOfLocation: location.id,
+        locationUpdateData: {
+          country: createLocationDetails.country,
+          year: createLocationDetails.year,
+          area: parseInt(createLocationDetails.area),
+          population: parseInt(createLocationDetails.total_population),
+        },
+      },
+      onError: (error) => {
+        alert.show(error.message, {
+          type: "error",
+        });
+        console.log(JSON.stringify(error));
+      },
+      onCompleted: () => {
+        alert.show("Record updated Successfully", {
+          type: "success",
+        });
+        setUpdateLocationConfirmation(false);
+      },
+      update(cache, { data: updateLocation }) {
+        const { getLocations } = cache.readQuery({
+          query: getLocationsQuery,
+        });
+
+        cache.writeQuery({
+          query: getLocationsQuery,
+          data: {
+            getLocations: getLocations.map((location) =>
+              location.id === updateLocation.id
+                ? { ...location, updateLocation }
+                : location
+            ),
+          },
+        });
+      },
+    }
+  );
+
+  const updateFormInputs = (e) =>
+    setCreateLocationDetails({
+      ...createLocationDetails,
+      [e.target.name]: e.target.value,
+    });
+
+  const { country, year, area, total_population } = createLocationDetails;
+
+  useEffect(() => {
+    if (location) {
+      setCreateLocationDetails({
+        ...createLocationDetails,
+        country: location.country,
+        year: location.year,
+        area: location.area,
+        total_population: location.total_population,
+      });
+    }
+  }, []);
+
   return (
     <>
       <div className="w-full py-5 px-7 bg-white my-4 rounded-md shadow-sm">
         <div
           id="location-data__cta"
-          className="flex justify-between items-center pb-3 border-b-2"
+          className="flex justify-between items-center pb-4 border-b-2"
         >
-          <h1>{location.country}</h1>
+          <h1 className="font-semibold text-xl">{location.country}</h1>
           <div className="flex items-center space-x-4">
             <PencilIcon
               onClick={handleEditClick}
@@ -82,6 +163,19 @@ const LocationItem = ({ location }) => {
               className="h-5 cursor-pointer"
             />
           </div>
+        </div>
+        <div className="mt-2 flex items-end justify-between">
+          <div>
+            <p className="font-semibold text-lg text-md text-blue-600">
+              Year ({location.year})
+            </p>
+            <p className="text-sm text-[#a0a4ae] mt-3">
+              Population - {location.total_population}
+            </p>
+          </div>
+          <p className="text-sm text-[#a0a4ae] mt-3">
+            Area - {location.area} k&#13217;
+          </p>
         </div>
       </div>
       <Modal isOpen={deleteLocationConfirmation}>
@@ -139,6 +233,9 @@ const LocationItem = ({ location }) => {
               <input
                 placeholder="Country"
                 type="text"
+                name="country"
+                value={country}
+                onChange={(e) => updateFormInputs(e)}
                 className="outline-none rounded-md px-6 py-3 text-xs text-slate-400"
               />
             </div>
@@ -149,6 +246,9 @@ const LocationItem = ({ location }) => {
               <input
                 placeholder="Year"
                 type="string"
+                name="year"
+                value={year}
+                onChange={(e) => updateFormInputs(e)}
                 className="outline-none rounded-md px-6 py-3 text-xs text-slate-400"
               />
             </div>
@@ -159,6 +259,9 @@ const LocationItem = ({ location }) => {
               <input
                 placeholder="Population"
                 type="number"
+                name="total_population"
+                value={total_population}
+                onChange={(e) => updateFormInputs(e)}
                 className="outline-none rounded-md font-semibold px-6 py-3 text-xs text-slate-400"
               />
             </div>
@@ -169,6 +272,9 @@ const LocationItem = ({ location }) => {
               <input
                 type="number"
                 placeholder="Area"
+                name="area"
+                value={area}
+                onChange={(e) => updateFormInputs(e)}
                 className="outline-none rounded-md px-6 py-3 text-xs text-slate-400"
               />
             </div>
@@ -183,10 +289,11 @@ const LocationItem = ({ location }) => {
               Cancel
             </button>
             <button
-              onClick={deleteLocation}
+              disabled={updateLoading}
+              onClick={updateLocation}
               className="py-3 w-full px-7 text-sm cursor-pointer text-white bg-[#F25F3A] rounded-md"
             >
-              Update Record
+              {updateLoading ? "Updating" : "Update Record"}
             </button>
           </div>
         </div>
